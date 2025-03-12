@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { type Product } from './products'
 
 export type CartItem = {
   id: string
@@ -199,7 +198,7 @@ export async function removeFromCart(cartItemId: string) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
     if (authError) throw authError
-    if (!user) return { error: new Error('No authenticated user') }
+    if (!user) return { data: null, error: new Error('No authenticated user') }
 
     const { error } = await supabase
       .from('cart_items')
@@ -208,55 +207,9 @@ export async function removeFromCart(cartItemId: string) {
       .eq('user_id', user.id)
 
     if (error) throw error
-    return { error: null }
+    return { data: true, error: null }
   } catch (error) {
     console.error('Error removing from cart:', error)
-    return { error }
-  }
-}
-
-/**
- * Clear all items from the cart
- * @returns Success status or error
- */
-export async function clearCart() {
-  try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError) throw authError
-    if (!user) return { error: new Error('No authenticated user') }
-
-    const { error } = await supabase
-      .from('cart_items')
-      .delete()
-      .eq('user_id', user.id)
-
-    if (error) throw error
-    return { error: null }
-  } catch (error) {
-    console.error('Error clearing cart:', error)
-    return { error }
-  }
-}
-
-/**
- * Calculate cart total
- * @returns Cart total amount or error
- */
-export async function getCartTotal() {
-  try {
-    const { data: cartItems, error } = await getCartItems()
-    if (error) throw error
-
-    const total = cartItems.reduce((sum, item) => {
-      if (!item.product) return sum
-      return sum + (item.product.price * item.quantity)
-    }, 0)
-
-    return { data: total, error: null }
-  } catch (error) {
-    console.error('Error calculating cart total:', error)
-    return { data: 0, error }
+    return { data: null, error }
   }
 }

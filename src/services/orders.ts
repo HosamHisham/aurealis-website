@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { type CartItem, clearCart } from './cart'
 import { type UserProfile } from './auth'
 
 export type OrderStatus = 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
@@ -39,26 +38,6 @@ export type OrderItem = {
  * @param notes Optional order notes
  * @returns Created order or error
  */
-type CartItemWithProduct = {
-  quantity: number
-  product: {
-    id: string
-    name: string
-    price: number
-    stock_quantity: number
-  } | null
-}
-
-type CartItemResponse = {
-  quantity: number
-  product: {
-    id: string
-    name: string
-    price: number
-    stock_quantity: number
-  }[]
-}
-
 export async function createOrder(shippingMethod: string, notes?: string) {
   try {
     const supabase = await createClient()
@@ -106,12 +85,7 @@ export async function createOrder(shippingMethod: string, notes?: string) {
       price_at_time: number
     }> = []
 
-    const typedCartItems = (cartItems as CartItemResponse[]).map(item => ({
-      quantity: item.quantity,
-      product: item.product[0] || null
-    })) as CartItemWithProduct[]
-
-    for (const item of typedCartItems) {
+    for (const item of cartItems) {
       if (!item.product) continue
       if (item.product.stock_quantity < item.quantity) {
         throw new Error(`Insufficient stock for ${item.product.name}`)
@@ -156,7 +130,7 @@ export async function createOrder(shippingMethod: string, notes?: string) {
     if (itemsError) throw itemsError
 
     // Update product stock quantities
-    for (const item of typedCartItems) {
+    for (const item of cartItems) {
       if (!item.product) continue
       const { error: stockError } = await supabase
         .from('products')
@@ -168,9 +142,6 @@ export async function createOrder(shippingMethod: string, notes?: string) {
 
       if (stockError) throw stockError
     }
-
-    // Clear the cart
-    await clearCart()
 
     return { data: order, error: null }
   } catch (error) {
@@ -199,13 +170,9 @@ export async function getOrderHistory(limit: number = 10, offset: number = 0) {
         *,
         items:order_items (
           id,
+          product_id,
           quantity,
-          price_at_time,
-          product:products (
-            name,
-            image_url,
-            category
-          )
+          price_at_time
         )
       `)
       .eq('user_id', user.id)
@@ -213,125 +180,9 @@ export async function getOrderHistory(limit: number = 10, offset: number = 0) {
       .range(offset, offset + limit - 1)
 
     if (ordersError) throw ordersError
-    return { data: orders || [], error: null }
+    return { data: orders, error: null }
   } catch (error) {
     console.error('Error fetching order history:', error)
     return { data: [], error }
-  }
-}
-
-/**
- * Get a specific order's details
- * @param orderId Order ID to fetch
- * @returns Order details with items or error
- */
-export async function getOrderDetails(orderId: string) {
-  try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError) throw authError
-    if (!user) return { data: null, error: new Error('No authenticated user') }
-
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        items:order_items (
-          id,
-          quantity,
-          price_at_time,
-          product:products (
-            name,
-            image_url,
-            category
-          )
-        )
-      `)
-      .eq('id', orderId)
-      .eq('user_id', user.id)
-      .single()
-
-    if (orderError) throw orderError
-    return { data: order, error: null }
-  } catch (error) {
-    console.error('Error fetching order details:', error)
-    return { data: null, error }
-  }
-}
-
-/**
- * Cancel an order if it's still pending
- * @param orderId Order ID to cancel
- * @returns Updated order or error
- */
-export async function cancelOrder(orderId: string) {
-  try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError) throw authError
-    if (!user) return { data: null, error: new Error('No authenticated user') }
-
-    // Get order status and items
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .select(`
-        status,
-        items:order_items (
-          product_id,
-          quantity
-        )
-      `)
-      .eq('id', orderId)
-      .eq('user_id', user.id)
-      .single()
-
-    if (orderError) throw orderError
-    if (!order) throw new Error('Order not found')
-    if (order.status !== 'pending') {
-      throw new Error('Only pending orders can be cancelled')
-    }
-
-    // Restore product stock quantities
-    for (const item of (order.items || [])) {
-      // Update stock directly since we can't use RPC
-      const { data: product, error: getError } = await supabase
-        .from('products')
-        .select('stock_quantity')
-        .eq('id', item.product_id)
-        .single()
-
-      if (getError) throw getError
-      if (!product) continue
-
-      const { error: stockError } = await supabase
-        .from('products')
-        .update({ 
-          stock_quantity: product.stock_quantity + item.quantity,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', item.product_id)
-
-      if (stockError) throw stockError
-    }
-
-    // Update order status
-    const { data: updatedOrder, error: updateError } = await supabase
-      .from('orders')
-      .update({ 
-        status: 'cancelled' as const,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', orderId)
-      .eq('user_id', user.id)
-      .select()
-      .single()
-
-    if (updateError) throw updateError
-    return { data: updatedOrder, error: null }
-  } catch (error) {
-    console.error('Error cancelling order:', error)
-    return { data: null, error }
   }
 }

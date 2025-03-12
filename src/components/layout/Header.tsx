@@ -41,7 +41,7 @@ export default function Header() {
                 <div className="flex h-full space-x-8">
                   {navigation.categories.map((category) => (
                     <Popover key={category.name} className="flex">
-                      {({ open }) => (
+                      {() => (
                         <>
                           <div className="relative flex">
                             <Popover.Button className="relative z-10 flex items-center text-sm font-medium text-gray-700 transition-colors duration-200 ease-out hover:text-gray-800">
