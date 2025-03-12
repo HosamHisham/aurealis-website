@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { cookies } from 'next/headers'
 import { type Provider } from '@supabase/supabase-js'
 
 export type UserProfile = {
@@ -199,18 +198,14 @@ async function createUserProfile(userId: string, email: string) {
           preferences: {
             newsletter: true,
             marketing: true,
-            language: 'en',
-            currency: 'USD'
-          }
-        }
+          },
+        },
       ])
-      .select()
-      .single()
 
     if (error) throw error
     return { data, error: null }
   } catch (error) {
     console.error('Error creating user profile:', error)
-    return { data: null, error: error as Error }
+    return { data: null, error }
   }
 }

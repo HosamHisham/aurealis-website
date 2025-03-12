@@ -1,7 +1,7 @@
 import { Fragment } from 'react'
 import Link from 'next/link'
 import { Popover, Transition } from '@headlessui/react'
-import { ShoppingBagIcon, UserIcon, Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline'
+import { ShoppingBagIcon, UserIcon, Bars3Icon } from '@heroicons/react/24/outline'
 import { useStore } from '@/store/cart'
 
 const navigation = {
