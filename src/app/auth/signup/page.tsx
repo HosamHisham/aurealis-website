@@ -40,7 +40,7 @@ export default function SignUp() {
         const data = await res.json()
         setError(data.message || 'Something went wrong')
       }
-    } catch (err) {
+    } catch {
       setError('An error occurred during registration')
     }
   }
